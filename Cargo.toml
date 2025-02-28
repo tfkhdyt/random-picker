@@ -1,0 +1,15 @@
+[package]
+name = "game-picker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rand = "0.9"
+directories = "6.0"
+
+[profile.release]
+opt-level = "z"   # "s" for small size, "z" for even smaller size
+lto = true        # Enable Link Time Optimization
+codegen-units = 1 # Reduce codegen units to allow better optimizations
+panic = "abort"   # Abort on panic to avoid generating unwinding code
+strip = true      # Automatically strip debug symbols (if supported)
