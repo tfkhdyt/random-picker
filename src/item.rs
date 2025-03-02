@@ -1,52 +1,31 @@
 use std::collections::HashSet;
-use std::fs;
+use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
-use std::{fs::File, path::PathBuf};
 
 use anyhow::{Context, Ok};
 use rand::Rng;
 
-pub fn create_default_list_of_items_file(items_file_path: &PathBuf) -> anyhow::Result<()> {
-    let default_item = ["Balatro"];
-    let mut file = File::create(items_file_path).with_context(|| {
-        format!(
-            "Failed to create list of items file in {:?}",
-            items_file_path
-        )
-    })?;
-    for item in &default_item {
-        writeln!(file, "{}", item).with_context(|| {
-            format!(
-                "Failed to write to list of items file in {:?}",
-                items_file_path
-            )
-        })?;
-    }
+use crate::dirs;
+use crate::setting::AppSetting;
 
-    Ok(())
+fn read_cache_file(group_name: &String) -> anyhow::Result<File> {
+    let app_cache_dir = dirs::get_app_cache_dir();
+    let cache_file_path = app_cache_dir.join(format!("{}.txt", group_name));
+
+    let file = OpenOptions::new()
+        .read(true)
+        .create(true) // creates the file if it doesn't exist
+        .append(true)
+        .open(cache_file_path)?;
+
+    Ok(file)
 }
 
-fn list_items(items_file_path: &PathBuf) -> anyhow::Result<Vec<String>> {
-    let items_content = fs::read_to_string(items_file_path)
-        .with_context(|| format!("Failed to read list of items in {:?}", items_file_path))?;
-    let items: Vec<String> = items_content
-        .lines()
-        .map(|line| line.trim().to_string())
-        .filter(|line| !line.is_empty())
-        .collect();
-
-    Ok(items)
-}
-
-fn list_choosed_items(choosed_file_path: &PathBuf) -> anyhow::Result<HashSet<String>> {
+fn list_cache_items(group_name: &String) -> anyhow::Result<HashSet<String>> {
     let mut choosed_set = HashSet::new();
-    let file = File::open(choosed_file_path).with_context(|| {
-        format!(
-            "Failed to open choosed items file in {:?}",
-            choosed_file_path
-        )
-    })?;
+    let file = read_cache_file(group_name)?;
+
     for line in BufReader::new(file).lines() {
         let line = line?;
         if !line.trim().is_empty() {
@@ -57,64 +36,42 @@ fn list_choosed_items(choosed_file_path: &PathBuf) -> anyhow::Result<HashSet<Str
     Ok(choosed_set)
 }
 
-fn list_available_items(
-    items_file_path: &PathBuf,
-    choosed_file_path: &PathBuf,
-) -> anyhow::Result<Vec<String>> {
-    let items = list_items(items_file_path)?;
-    let choosed_items = list_choosed_items(choosed_file_path)?;
+fn list_available_items(items: &[String], group_name: &String) -> anyhow::Result<Vec<String>> {
+    let choosed_items = list_cache_items(group_name)?;
 
     if items.is_empty() {
-        anyhow::bail!("The items list is empty in {:?}", items_file_path);
+        anyhow::bail!("The {} items list is empty", group_name);
     }
 
     let available_items: Vec<String> = items
-        .into_iter()
-        .filter(|item| !choosed_items.contains(item))
+        .iter()
+        .filter(|&item| !choosed_items.contains(item))
+        .cloned()
         .collect();
 
     Ok(available_items)
 }
 
-pub fn append_chosen_to_choosed_items(
-    choosed_file_path: &PathBuf,
-    chosen: &String,
-) -> anyhow::Result<()> {
-    let mut file = OpenOptions::new()
-        .append(true)
-        .open(choosed_file_path)
-        .with_context(|| {
-            format!(
-                "Failed to open choosed items file in {:?}",
-                choosed_file_path
-            )
-        })?;
-    writeln!(file, "{}", chosen).with_context(|| {
-        format!(
-            "Failed to write into choosed items file in {:?}",
-            choosed_file_path
-        )
-    })?;
+pub fn append_chosen_to_cache_file(group_name: &String, chosen: &String) -> anyhow::Result<()> {
+    let mut file = read_cache_file(group_name)?;
+
+    writeln!(file, "{}", chosen).expect("Failed to write into cache file");
 
     Ok(())
 }
 
-pub fn choose_random_item(
-    items_file_path: &PathBuf,
-    choosed_file_path: &PathBuf,
-) -> anyhow::Result<String> {
-    let items = list_items(items_file_path)?;
+pub fn choose_random_item(items: &[String], group_name: &String) -> anyhow::Result<String> {
     if items.is_empty() {
-        anyhow::bail!("The items list is empty in {:?}", items_file_path);
+        anyhow::bail!("The items list is empty");
     }
 
     // Filter available items (items not yet choosed).
-    let mut available = list_available_items(items_file_path, choosed_file_path)?;
+    let mut available = list_available_items(items, group_name)?;
 
     // If all items have been chosen, reset the list.
     if available.is_empty() {
         println!("All items have been chosen. Resetting the list.");
-        reset_choosed_items(choosed_file_path)?;
+        reset_cache(group_name)?;
         available = items.to_vec();
     }
 
@@ -124,29 +81,51 @@ pub fn choose_random_item(
     Ok(chosen.clone())
 }
 
-pub fn print_choosed_item(choosed_file_path: &PathBuf) -> anyhow::Result<()> {
-    let content = fs::read_to_string(choosed_file_path).with_context(|| {
-        format!(
-            "Failed to read choosed items file in {:?}",
-            choosed_file_path
-        )
-    })?;
-    if content.trim().is_empty() {
+pub fn print_choosed_item(group_name: &String) -> anyhow::Result<()> {
+    let choosed_items = list_cache_items(group_name)?;
+    if choosed_items.is_empty() {
         println!("No items have been chosen yet.");
     } else {
-        println!("Choosed items:");
-        print!("{}", content);
+        choosed_items.iter().for_each(|item| println!("{}", item));
+    }
+
+    Ok(())
+}
+
+pub fn print_all_items(app_setting: &AppSetting, group_name: String) -> anyhow::Result<()> {
+    let found_group = app_setting
+        .groups
+        .iter()
+        .find(|item| item.name == group_name);
+
+    if let Some(gr) = found_group {
+        gr.items.iter().for_each(|item| {
+            println!("{}", *item);
+        });
+    } else {
+        println!("No items in this group is configured")
+    };
+
+    Ok(())
+}
+
+pub fn print_unchoosed_item(items: &[String], group_name: &String) -> anyhow::Result<()> {
+    let available = list_available_items(items, group_name)?;
+    if available.is_empty() {
+        println!("No items have been chosen yet.");
+    } else {
+        available.iter().for_each(|a| println!("{}", a));
     }
     Ok(())
 }
 
-pub fn reset_choosed_items(choosed_file_path: &PathBuf) -> anyhow::Result<()> {
-    fs::write(choosed_file_path, "").with_context(|| {
-        format!(
-            "Failed to clear choosed items file in {:?}",
-            choosed_file_path
-        )
-    })?;
+pub fn reset_cache(group_name: &String) -> anyhow::Result<()> {
+    let mut cache_file = read_cache_file(group_name)?;
+
+    cache_file
+        .write_all(b"")
+        .with_context(|| "Failed to clear cache")?;
+
     println!("Choosed items list has been reset.");
     Ok(())
 }

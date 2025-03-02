@@ -1,55 +1,89 @@
 mod dirs;
+mod group;
 mod item;
+mod setting;
 
-use std::fs;
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
+use clap_complete::Shell;
+use setting::AppSetting;
+use std::{fs, io};
+
+#[derive(Parser)]
+#[command(name = "random-picker")]
+#[command(version, about = "Random item picker", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+
+    #[arg(short, long, value_parser = group::parse_group, help = "Group name")]
+    group: Option<String>,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+enum ListType {
+    All = 0,
+    Chosen = 1,
+    Unchosen = 2,
+}
+
+#[derive(ValueEnum, Clone)]
+enum ResetType {
+    All = 0,
+    Chosen = 1,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    #[command(about = "List configured items")]
+    List {
+        #[arg(value_enum, default_value_t = ListType::Chosen)]
+        list_type: ListType,
+    },
+
+    #[command(about = "Reset configured items")]
+    Reset,
+
+    #[command(about = "Generate shell completion")]
+    Completion { shell: Shell },
+}
 
 fn main() -> anyhow::Result<()> {
-    // Define the config directory and file for the items list.
-    let app_config_dir = dirs::get_app_config_dir();
-    let items_file_path = app_config_dir.join("items.txt");
+    let app_setting = AppSetting::get_instance();
 
-    // Define the cache directory and file for the choosed items list.
     let app_cache_dir = dirs::get_app_cache_dir();
-    let choosed_file_path = app_cache_dir.join("choosed-items.txt");
-
-    // Ensure the configuration and cache directories exist.
-    fs::create_dir_all(&app_config_dir)?;
     fs::create_dir_all(&app_cache_dir)?;
+    // let choosed_file_path = app_cache_dir.join("choosed-items.txt");
 
-    // If the items file doesn't exist, create it with a default list.
-    if !items_file_path.exists() {
-        item::create_default_list_of_items_file(&items_file_path)?;
-    }
+    let cli = Cli::parse();
 
-    // Ensure the choosed items file exists.
-    if !choosed_file_path.exists() {
-        fs::File::create(&choosed_file_path)?;
-    }
+    let group_name = cli.group.or(app_setting.default_group.clone());
+    let Some(group_name) = group_name else {
+        anyhow::bail!("No group provided");
+    };
 
-    // Handle command-line arguments.
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() > 1 {
-        match args[1].as_str() {
-            "list" => {
-                item::print_choosed_item(&choosed_file_path)?;
-                return Ok(());
-            }
-            "reset" => {
-                item::reset_choosed_items(&choosed_file_path)?;
-                return Ok(());
-            }
-            _ => {} // Continue with main logic if no recognized subcommand.
+    let group = app_setting.groups.iter().find(|g| g.name == group_name);
+    let Some(group) = group else {
+        anyhow::bail!("Group item not found")
+    };
+
+    match &cli.command {
+        Some(Commands::List { list_type }) => match list_type {
+            ListType::All => item::print_all_items(&app_setting, group_name)?,
+            ListType::Chosen => item::print_choosed_item(&group_name)?,
+            ListType::Unchosen => item::print_unchoosed_item(&group.items, &group_name)?,
+        },
+        Some(Commands::Reset) => item::reset_cache(&group_name)?,
+        Some(Commands::Completion { shell }) => {
+            let mut cmd = Cli::command();
+            clap_complete::generate(*shell, &mut cmd, "rp", &mut io::stdout());
+        }
+        None => {
+            let chosen = item::choose_random_item(&group.items, &group_name)?;
+
+            println!("Item chosen: {}", chosen);
+
+            item::append_chosen_to_cache_file(&group_name, &chosen)?;
         }
     }
-
-    // Select a random item from the available list.
-    let chosen = item::choose_random_item(&items_file_path, &choosed_file_path)?;
-
-    // Display the chosen item.
-    println!("Item chosen: {}", chosen);
-
-    // Append the chosen item to the choosed items file.
-    item::append_chosen_to_choosed_items(&choosed_file_path, &chosen)?;
-
     Ok(())
 }
