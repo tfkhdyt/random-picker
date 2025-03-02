@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
@@ -22,18 +21,16 @@ fn read_cache_file(group_name: &String) -> anyhow::Result<File> {
     Ok(file)
 }
 
-fn list_cache_items(group_name: &String) -> anyhow::Result<HashSet<String>> {
-    let mut choosed_set = HashSet::new();
-    let file = read_cache_file(group_name)?;
+fn list_cache_items(group_name: &String) -> anyhow::Result<Vec<String>> {
+    let file = read_cache_file(group_name)?; // Assuming read_cache_file handles the file opening
+    let reader = BufReader::new(file);
 
-    for line in BufReader::new(file).lines() {
-        let line = line?;
-        if !line.trim().is_empty() {
-            choosed_set.insert(line);
-        }
+    let mut lines = Vec::new();
+    for line in reader.lines() {
+        let line = line?; // Propagate any error that occurs while reading the line
+        lines.push(line);
     }
-
-    Ok(choosed_set)
+    Ok(lines)
 }
 
 fn list_available_items(items: &[String], group_name: &String) -> anyhow::Result<Vec<String>> {
