@@ -5,9 +5,9 @@ fn get_base_dirs() -> directories::BaseDirs {
 }
 
 pub fn get_app_config_dir() -> std::path::PathBuf {
-    get_base_dirs().config_local_dir().join("game-picker")
+    get_base_dirs().config_local_dir().join("random-picker")
 }
 
 pub fn get_app_cache_dir() -> std::path::PathBuf {
-    get_base_dirs().cache_dir().join("game-picker")
+    get_base_dirs().cache_dir().join("random-picker")
 }
