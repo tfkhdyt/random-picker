@@ -2,7 +2,7 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 
-use anyhow::{Context, Ok};
+use anyhow::Ok;
 use rand::Rng;
 
 use crate::dirs;
@@ -14,7 +14,7 @@ fn read_cache_file(group_name: &String) -> anyhow::Result<File> {
 
     let file = OpenOptions::new()
         .read(true)
-        .create(true) // creates the file if it doesn't exist
+        .create(true)
         .append(true)
         .open(cache_file_path)?;
 
@@ -117,11 +117,13 @@ pub fn print_unchoosed_item(items: &[String], group_name: &String) -> anyhow::Re
 }
 
 pub fn reset_cache(group_name: &String) -> anyhow::Result<()> {
-    let mut cache_file = read_cache_file(group_name)?;
+    let app_cache_dir = dirs::get_app_cache_dir();
+    let cache_file_path = app_cache_dir.join(format!("{}.txt", group_name));
 
-    cache_file
-        .write_all(b"")
-        .with_context(|| "Failed to clear cache")?;
+    OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(cache_file_path)?;
 
     println!("Choosed items list has been reset.");
     Ok(())
