@@ -1,3 +1,6 @@
+use std::fs;
+
+use anyhow::Context;
 use config::Config;
 use serde::{Deserialize, Serialize};
 
@@ -16,10 +19,20 @@ pub struct AppSetting {
 }
 
 impl AppSetting {
-    pub fn get_instance() -> Self {
+    pub fn get_config_path() -> String {
         let app_config_dir = dirs::get_app_config_dir();
 
         let config_file = app_config_dir.join("config.yaml");
+        config_file
+            .to_str()
+            .expect("Failed to resolve config file path")
+            .to_string()
+    }
+
+    pub fn get_instance() -> Self {
+        let app_config_dir = dirs::get_app_config_dir();
+        let config_file = app_config_dir.join("config.yaml");
+
         let config_file_path = config_file
             .to_str()
             .expect("Failed to resolve config file path");
@@ -31,5 +44,19 @@ impl AppSetting {
         app_config_builder
             .try_deserialize::<AppSetting>()
             .expect("Failed to deserialize config file")
+    }
+
+    pub fn write_to_config(new_config: String) -> anyhow::Result<()> {
+        let app_config_dir = dirs::get_app_config_dir();
+
+        let config_file = app_config_dir.join("config.yaml");
+        let config_file_path = config_file
+            .to_str()
+            .expect("Failed to resolve config file path");
+
+        fs::write(config_file_path, new_config)
+            .with_context(|| format!("Failed to write to config"))?;
+
+        Ok(())
     }
 }
