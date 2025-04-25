@@ -120,10 +120,22 @@ pub fn reset_cache(group_name: &String) -> anyhow::Result<()> {
     let app_cache_dir = dirs::get_app_cache_dir();
     let cache_file_path = app_cache_dir.join(format!("{}.txt", group_name));
 
-    OpenOptions::new()
+    // Read all lines from the file
+    let file = OpenOptions::new().read(true).open(&cache_file_path)?;
+    let reader = BufReader::new(file);
+    let lines: Vec<String> = reader.lines().filter_map(Result::ok).collect();
+
+    // Get the last line, if any
+    let last_line = lines.last().cloned().unwrap_or_default();
+
+    // Overwrite the file with only the last line (or empty if no lines)
+    let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open(cache_file_path)?;
+        .open(&cache_file_path)?;
+    if !last_line.is_empty() {
+        writeln!(file, "{}", last_line)?;
+    }
 
     println!("Choosed items list has been reset.");
     Ok(())
