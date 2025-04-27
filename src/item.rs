@@ -1,3 +1,4 @@
+use std::fs;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
@@ -135,11 +136,20 @@ pub fn reset_cache(group_name: &str) -> anyhow::Result<()> {
     // Clear the file cache for this group
     FILE_CACHE.lock().unwrap().remove(group_name);
 
-    // Simply truncate the file instead of reading and rewriting
-    OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(&cache_file_path)?;
+    // Read the file content
+    let content = fs::read_to_string(&cache_file_path)?;
+    let lines: Vec<&str> = content.lines().collect();
+
+    // Keep only the last 2 lines if there are at least 2 lines
+    // Otherwise clear the file completely
+    let lines_to_keep = if lines.len() >= 2 {
+        lines[lines.len() - 2..].to_vec()
+    } else {
+        Vec::new() // Return empty vector to clear the file
+    };
+
+    // Write back only the last 2 lines or empty string to clear
+    fs::write(&cache_file_path, lines_to_keep.join("\n"))?;
 
     println!("Choosed items list has been reset.");
     Ok(())
