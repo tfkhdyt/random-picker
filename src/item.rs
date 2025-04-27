@@ -69,7 +69,7 @@ pub fn choose_random_item(items: &[String], group_name: &String) -> anyhow::Resu
     if available.is_empty() {
         println!("All items have been chosen. Resetting the list.");
         reset_cache(group_name)?;
-        available = items.to_vec();
+        available = list_available_items(items, group_name)?;
     }
 
     let mut rng = rand::rng();
