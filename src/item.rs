@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
@@ -37,14 +36,14 @@ fn read_cache_file(group_name: &str) -> anyhow::Result<File> {
     Ok(file)
 }
 
-fn list_cache_items(group_name: &str) -> anyhow::Result<HashSet<String>> {
+fn list_cache_items(group_name: &str) -> anyhow::Result<Vec<String>> {
     let file = read_cache_file(group_name)?;
     let reader = BufReader::new(file);
 
-    let mut lines = HashSet::new();
+    let mut lines = Vec::new();
     for line in reader.lines() {
         let line = line?;
-        lines.insert(line);
+        lines.push(line);
     }
     Ok(lines)
 }
