@@ -125,16 +125,20 @@ pub fn reset_cache(group_name: &String) -> anyhow::Result<()> {
     let reader = BufReader::new(file);
     let lines: Vec<String> = reader.lines().filter_map(Result::ok).collect();
 
-    // Get the last line, if any
-    let last_line = lines.last().cloned().unwrap_or_default();
+    // Get the last two lines, if available
+    let last_two_lines: Vec<String> = if lines.len() >= 2 {
+        lines[lines.len() - 2..].to_vec()
+    } else {
+        lines.clone()
+    };
 
-    // Overwrite the file with only the last line (or empty if no lines)
+    // Overwrite the file with only the last two lines (or empty if no lines)
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
         .open(&cache_file_path)?;
-    if !last_line.is_empty() {
-        writeln!(file, "{}", last_line)?;
+    for line in last_two_lines {
+        writeln!(file, "{}", line)?;
     }
 
     println!("Choosed items list has been reset.");
