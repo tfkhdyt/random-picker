@@ -94,7 +94,7 @@ fn main() -> anyhow::Result<()> {
 
     match &cli.command {
         Some(Commands::List { list_type }) => match list_type {
-            ListType::All => item::print_all_items(&app_setting, group_name)?,
+            ListType::All => item::print_all_items(app_setting, &group_name)?,
             ListType::Chosen => item::print_choosed_item(&group_name)?,
             ListType::Unchosen => item::print_unchoosed_item(&group.items, &group_name)?,
         },

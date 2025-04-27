@@ -12,6 +12,7 @@ clap_complete = "4.5"
 config = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 serde_yml = "0.0.12"
+lazy_static = "1.4"
 
 [profile.release]
 opt-level = "z"   # "s" for small size, "z" for even smaller size

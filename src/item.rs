@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
@@ -8,7 +9,21 @@ use rand::Rng;
 use crate::dirs;
 use crate::setting::AppSetting;
 
-fn read_cache_file(group_name: &String) -> anyhow::Result<File> {
+// Cache for storing file handles
+use std::collections::HashMap;
+use std::sync::Mutex;
+lazy_static::lazy_static! {
+    static ref FILE_CACHE: Mutex<HashMap<String, File>> = Mutex::new(HashMap::new());
+}
+
+fn read_cache_file(group_name: &str) -> anyhow::Result<File> {
+    let mut cache = FILE_CACHE.lock().unwrap();
+
+    if let Some(file) = cache.get(group_name) {
+        // Clone the file handle
+        return Ok(file.try_clone()?);
+    }
+
     let app_cache_dir = dirs::get_app_cache_dir();
     let cache_file_path = app_cache_dir.join(format!("{}.txt", group_name));
 
@@ -18,22 +33,23 @@ fn read_cache_file(group_name: &String) -> anyhow::Result<File> {
         .append(true)
         .open(cache_file_path)?;
 
+    cache.insert(group_name.to_string(), file.try_clone()?);
     Ok(file)
 }
 
-fn list_cache_items(group_name: &String) -> anyhow::Result<Vec<String>> {
-    let file = read_cache_file(group_name)?; // Assuming read_cache_file handles the file opening
+fn list_cache_items(group_name: &str) -> anyhow::Result<HashSet<String>> {
+    let file = read_cache_file(group_name)?;
     let reader = BufReader::new(file);
 
-    let mut lines = Vec::new();
+    let mut lines = HashSet::new();
     for line in reader.lines() {
-        let line = line?; // Propagate any error that occurs while reading the line
-        lines.push(line);
+        let line = line?;
+        lines.insert(line);
     }
     Ok(lines)
 }
 
-fn list_available_items(items: &[String], group_name: &String) -> anyhow::Result<Vec<String>> {
+fn list_available_items(items: &[String], group_name: &str) -> anyhow::Result<Vec<String>> {
     let choosed_items = list_cache_items(group_name)?;
 
     if items.is_empty() {
@@ -49,23 +65,19 @@ fn list_available_items(items: &[String], group_name: &String) -> anyhow::Result
     Ok(available_items)
 }
 
-pub fn append_chosen_to_cache_file(group_name: &String, chosen: &String) -> anyhow::Result<()> {
+pub fn append_chosen_to_cache_file(group_name: &str, chosen: &str) -> anyhow::Result<()> {
     let mut file = read_cache_file(group_name)?;
-
-    writeln!(file, "{}", chosen).expect("Failed to write into cache file");
-
+    writeln!(file, "{}", chosen)?;
     Ok(())
 }
 
-pub fn choose_random_item(items: &[String], group_name: &String) -> anyhow::Result<String> {
+pub fn choose_random_item(items: &[String], group_name: &str) -> anyhow::Result<String> {
     if items.is_empty() {
         anyhow::bail!("The items list is empty");
     }
 
-    // Filter available items (items not yet choosed).
     let mut available = list_available_items(items, group_name)?;
 
-    // If all items have been chosen, reset the list.
     if available.is_empty() {
         println!("All items have been chosen. Resetting the list.");
         reset_cache(group_name)?;
@@ -78,68 +90,57 @@ pub fn choose_random_item(items: &[String], group_name: &String) -> anyhow::Resu
     Ok(chosen.clone())
 }
 
-pub fn print_choosed_item(group_name: &String) -> anyhow::Result<()> {
+pub fn print_choosed_item(group_name: &str) -> anyhow::Result<()> {
     let choosed_items = list_cache_items(group_name)?;
     if choosed_items.is_empty() {
         println!("No items have been chosen yet.");
     } else {
-        choosed_items.iter().for_each(|item| println!("{}", item));
+        for item in choosed_items {
+            println!("{}", item);
+        }
     }
-
     Ok(())
 }
 
-pub fn print_all_items(app_setting: &AppSetting, group_name: String) -> anyhow::Result<()> {
-    let found_group = app_setting
+pub fn print_all_items(app_setting: &AppSetting, group_name: &str) -> anyhow::Result<()> {
+    if let Some(gr) = app_setting
         .groups
         .iter()
-        .find(|item| item.name == group_name);
-
-    if let Some(gr) = found_group {
-        gr.items.iter().for_each(|item| {
-            println!("{}", *item);
-        });
+        .find(|item| item.name == group_name)
+    {
+        for item in &gr.items {
+            println!("{}", item);
+        }
     } else {
-        println!("No items in this group is configured")
-    };
-
+        println!("No items in this group is configured");
+    }
     Ok(())
 }
 
-pub fn print_unchoosed_item(items: &[String], group_name: &String) -> anyhow::Result<()> {
+pub fn print_unchoosed_item(items: &[String], group_name: &str) -> anyhow::Result<()> {
     let available = list_available_items(items, group_name)?;
     if available.is_empty() {
         println!("No items have been chosen yet.");
     } else {
-        available.iter().for_each(|a| println!("{}", a));
+        for item in available {
+            println!("{}", item);
+        }
     }
     Ok(())
 }
 
-pub fn reset_cache(group_name: &String) -> anyhow::Result<()> {
+pub fn reset_cache(group_name: &str) -> anyhow::Result<()> {
     let app_cache_dir = dirs::get_app_cache_dir();
     let cache_file_path = app_cache_dir.join(format!("{}.txt", group_name));
 
-    // Read all lines from the file
-    let file = OpenOptions::new().read(true).open(&cache_file_path)?;
-    let reader = BufReader::new(file);
-    let lines: Vec<String> = reader.lines().filter_map(Result::ok).collect();
+    // Clear the file cache for this group
+    FILE_CACHE.lock().unwrap().remove(group_name);
 
-    // Get the last two lines, if available
-    let last_two_lines: Vec<String> = if lines.len() >= 2 {
-        lines[lines.len() - 2..].to_vec()
-    } else {
-        lines.clone()
-    };
-
-    // Overwrite the file with only the last two lines (or empty if no lines)
-    let mut file = OpenOptions::new()
+    // Simply truncate the file instead of reading and rewriting
+    OpenOptions::new()
         .write(true)
         .truncate(true)
         .open(&cache_file_path)?;
-    for line in last_two_lines {
-        writeln!(file, "{}", line)?;
-    }
 
     println!("Choosed items list has been reset.");
     Ok(())
