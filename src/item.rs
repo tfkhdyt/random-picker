@@ -149,7 +149,12 @@ pub fn reset_cache(group_name: &str) -> anyhow::Result<()> {
     };
 
     // Write back only the last 2 lines or empty string to clear
-    fs::write(&cache_file_path, lines_to_keep.join("\n"))?;
+    let content_to_write = if !lines_to_keep.is_empty() {
+        format!("{}\n", lines_to_keep.join("\n"))
+    } else {
+        String::new()
+    };
+    fs::write(&cache_file_path, content_to_write)?;
 
     println!("Choosed items list has been reset.");
     Ok(())
