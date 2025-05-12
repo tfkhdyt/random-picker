@@ -27,7 +27,8 @@ Use 'rp list' to view items with the following type options:
   - all:      Lists all items in the group
   - chosen:   Lists items that have been chosen (default)
   - unchosen: Lists items that haven't been chosen yet`,
-		RunE: runPick,
+		RunE:    runPick,
+		Version: "1.0.0",
 	}
 
 	// Persistent flags
