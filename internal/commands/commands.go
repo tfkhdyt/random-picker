@@ -19,14 +19,9 @@ var groupFlag string
 func SetupCommands() *cobra.Command {
 	// Primary command
 	rootCmd := &cobra.Command{
-		Use:   "rp",
-		Short: "Random item picker",
-		Long: `Random item picker (rp) is a CLI tool to randomly pick items.
-
-Use 'rp list' to view items with the following type options:
-  - all:      Lists all items in the group
-  - chosen:   Lists items that have been chosen (default)
-  - unchosen: Lists items that haven't been chosen yet`,
+		Use:     "rp",
+		Short:   "Random item picker",
+		Long:    `Random item picker (rp) is a CLI tool to randomly pick items.`,
 		RunE:    runPick,
 		Version: "1.0.0",
 	}
@@ -48,7 +43,8 @@ func setupListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list [type]",
 		Short: "List configured items",
-		Long: `List configured items based on type:
+		Long: `List configured items based on type.
+
 Available types:
   - all:      Lists all items in the group
   - chosen:   Lists items that have been chosen (default)
