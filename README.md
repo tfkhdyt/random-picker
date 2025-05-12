@@ -20,20 +20,20 @@ A simple, fast CLI tool written in Go for randomly selecting items from configur
 
 ### From Releases
 
-Download the [latest release](https://github.com/tfkhdyt/random-picker-go/releases/latest) for your platform.
+Download the [latest release](https://github.com/tfkhdyt/random-picker/releases/latest) for your platform.
 
 ### Using Go Install
 
 ```bash
-go install github.com/tfkhdyt/random-picker-go/cmd/random-picker@latest
+go install github.com/tfkhdyt/random-picker/cmd/random-picker@latest
 ```
 
 ### From Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/tfkhdyt/random-picker-go.git
-cd random-picker-go
+git clone https://github.com/tfkhdyt/random-picker.git
+cd random-picker
 
 # Build the binary
 go build -o rp ./cmd/random-picker
