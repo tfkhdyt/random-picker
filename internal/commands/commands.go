@@ -23,7 +23,7 @@ func SetupCommands() *cobra.Command {
 		Short:   "Random item picker",
 		Long:    `Random item picker (rp) is a CLI tool to randomly pick items.`,
 		RunE:    runPick,
-		Version: "1.0.0",
+		Version: "1.0.2",
 	}
 
 	// Persistent flags
