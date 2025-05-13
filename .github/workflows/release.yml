@@ -9,7 +9,43 @@ permissions:
   contents: write
 
 jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Extract tag version
+        id: get_tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Tag version: ${TAG}"
+
+      - name: Check version in code
+        id: check_version
+        run: |
+          CODE_VERSION=$(grep -oP 'Version:\s*"\K[^"]+' internal/commands/commands.go)
+          echo "code_version=${CODE_VERSION}" >> $GITHUB_OUTPUT
+          echo "Code version: ${CODE_VERSION}"
+
+          if [[ "${{ steps.get_tag.outputs.tag }}" != "${CODE_VERSION}" ]]; then
+            echo "::error::Version mismatch! Tag version (${{ steps.get_tag.outputs.tag }}) does not match code version (${CODE_VERSION})"
+            exit 1
+          else
+            echo "Versions match! Tag version: ${{ steps.get_tag.outputs.tag }}, Code version: ${CODE_VERSION}"
+          fi
+
   goreleaser:
+    needs: version-check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
