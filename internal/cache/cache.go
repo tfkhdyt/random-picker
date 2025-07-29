@@ -3,6 +3,7 @@ package cache
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,7 +74,7 @@ func AppendChosenToCacheFile(groupName, chosen string) error {
 	return nil
 }
 
-// ResetCache resets the cache for a group, keeping only the last 2 chosen items
+// ResetCache resets the cache for a group, keeping only the last 25% of chosen items, rounded up.
 func ResetCache(groupName string) error {
 	cacheFile := GetCacheFilePath(groupName)
 
@@ -97,10 +98,11 @@ func ResetCache(groupName string) error {
 		}
 	}
 
-	// Keep only the last 2 lines if there are at least 2 lines
+	// Keep only the last 25% of lines, rounded up
 	var linesToKeep []string
-	if len(nonEmptyLines) >= 2 {
-		linesToKeep = nonEmptyLines[len(nonEmptyLines)-2:]
+	if len(nonEmptyLines) > 0 {
+		keepCount := int(math.Ceil(0.25 * float64(len(nonEmptyLines))))
+		linesToKeep = nonEmptyLines[len(nonEmptyLines)-keepCount:]
 	}
 
 	// Write back
